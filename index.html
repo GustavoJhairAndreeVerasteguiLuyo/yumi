@@ -73,7 +73,7 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
   <div class="field"><label>Unidad</label><select id="newUnit"><option>kg</option><option>unidad</option><option>litro</option><option>paquete</option></select></div>
  </div><div class="actions"><button onclick="addDish()">Agregar plato</button></div>
 </section>
-<footer>Los datos se guardan en este navegador mediante almacenamiento local. No se envían a ningún servidor.</footer>
+<section class="card" style="margin-top:15px" id="pixelragPanel"><h2>Asistente PixelRAG</h2><p class="sub">Consulta visual del menú, inventario y presupuesto actual. Procesamiento local mediante Python.</p><div class="actions"><input id="aiQuestion" style="flex:1" placeholder="¿Cuánto cuesta mi compra semanal?" maxlength="500"><button id="aiAsk" onclick="askPixelRAG()">Consultar IA</button></div><div class="notice" id="aiAnswer" role="status" style="white-space:pre-wrap">Escribe una pregunta sobre tu planificación.</div><div id="aiEvidence" class="actions"></div></section><footer>Los datos se guardan en este navegador mediante almacenamiento local. Al consultar PixelRAG, la planificación se envía al backend local para generar capturas visuales.</footer>
 </main>
 <script>
 const seed={
@@ -123,4 +123,12 @@ function addDish(){let name=document.getElementById("newDish").value.trim(),ingN
 function exportCSV(){let people=Math.max(1,Number(document.getElementById("people").value)||1),extra=Number(document.getElementById("reserve").value)/100,need={};data.menu.forEach(m=>data.recipes.filter(r=>r.dish===m.dish).forEach(r=>{let i=data.ingredients.find(x=>x.id===r.ing);if(i){need[i.id]??={i,qty:0};need[i.id].qty+=people*r.qty*(1+extra)}}));let rows=[["Ingrediente","Unidad","Necesidad","Disponible","Comprar","Costo estimado (Gs.)"]];Object.values(need).forEach(x=>{let b=Math.max(0,x.qty-x.i.stock);rows.push([x.i.name,x.i.unit,x.qty.toFixed(2),x.i.stock,b.toFixed(2),(b*x.i.cost).toFixed(0)])});let blob=new Blob(["\ufeff"+rows.map(r=>r.join(";")).join("\n")],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="lista_compras_familiar.csv";a.click();URL.revokeObjectURL(a.href)}
 function resetAll(){if(confirm("¿Restablecer el menú, recetas e inventario de ejemplo?")){data=fresh();save();render()}}
 load();render();
+
+async function askPixelRAG(){
+ const q=document.getElementById('aiQuestion').value.trim(), answer=document.getElementById('aiAnswer'), button=document.getElementById('aiAsk'), evidence=document.getElementById('aiEvidence');
+ if(!q){answer.textContent='Escribe una pregunta.';return;}
+ button.disabled=true;answer.textContent='Procesando imágenes. La primera consulta puede tardar varios minutos.';evidence.replaceChildren();
+ try{render();const response=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,data,people:document.getElementById('people').value,budget:document.getElementById('budget').value,reserve:document.getElementById('reserve').value})});const result=await response.json();if(!response.ok)throw Error(typeof result.detail==='string'?result.detail:'Error del backend');answer.textContent=result.answer;for(const item of result.evidence){const img=document.createElement('img');img.src='data:image/png;base64,'+item.image;img.alt=item.name;img.style.cssText='width: min(100%, 420px);border:1px solid #ddd;border-radius:8px';evidence.append(img);}}
+ catch(e){answer.textContent='Error: '+e.message+'. Verifica que FastAPI esté ejecutándose.';}finally{button.disabled=false;}
+}
 </script></body></html>
