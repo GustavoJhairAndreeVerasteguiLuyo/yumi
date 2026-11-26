@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+playwright
+torch
+transformers>=4.49,<5
+pillow
